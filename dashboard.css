@@ -1,0 +1,119 @@
+/* ── PALETA iGREEN ─────────────────────────────────────────────────────────── */
+:root {
+  --verde:       #10B981;
+  --verde-dest:  #34D399;
+  --ciano:       #06B6D4;
+  --ambar:       #F59E0B;
+  --vermelho:    #EF4444;
+  --laranja:     #F97316;
+  --fundo:       #020617;
+  --fundo-medio: #0A0F1E;
+  --bloco:       #1E293B;
+  --divisoria:   #334155;
+  --txt-aux:     #64748B;
+  --label:       #94A3B8;
+  --txt-claro:   #CBD5E1;
+  --branco:      #FFFFFF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--fundo); color: var(--branco); height: 100vh; overflow: hidden; }
+#app { display: flex; height: 100vh; }
+
+/* ── SIDEBAR ── */
+#sidebar { width: 185px; min-width: 185px; background: var(--fundo-medio); border-right: 1px solid var(--divisoria); display: flex; flex-direction: column; padding: 20px 0; overflow-y: auto; }
+#sidebar::-webkit-scrollbar { width: 3px; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--divisoria); border-radius: 2px; }
+.sb-logo { display: flex; align-items: center; gap: 8px; padding: 0 16px 20px; border-bottom: 1px solid var(--divisoria); margin-bottom: 16px; flex-shrink: 0; }
+.sb-logo-dot { width: 28px; height: 28px; background: var(--verde); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--fundo); }
+.sb-logo-name { font-size: 14px; font-weight: 700; color: var(--branco); }
+.sb-title { font-size: 10px; font-weight: 600; color: var(--txt-aux); text-transform: uppercase; letter-spacing: .1em; padding: 0 16px 10px; flex-shrink: 0; }
+.nav-item { padding: 9px 16px; font-size: 13px; color: var(--label); cursor: pointer; border-left: 2px solid transparent; transition: all .12s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.nav-item:hover { background: var(--bloco); color: var(--txt-claro); }
+.nav-item.active { background: rgba(16,185,129,.12); color: var(--verde-dest); border-left-color: var(--verde); font-weight: 600; }
+.nav-div { height: 1px; background: var(--divisoria); margin: 10px 16px; flex-shrink: 0; }
+#upload-zone { margin-top: auto; padding: 16px; flex-shrink: 0; }
+.upload-btn { display: block; width: 100%; padding: 9px; font-size: 12px; border-radius: 8px; background: transparent; border: 1px dashed var(--divisoria); color: var(--label); cursor: pointer; text-align: center; transition: all .12s; }
+.upload-btn:hover { border-color: var(--verde); color: var(--verde-dest); background: rgba(16,185,129,.08); }
+.upload-hint { font-size: 11px; color: var(--txt-aux); text-align: center; margin-top: 6px; }
+#file-input { display: none; }
+
+/* ── TOPBAR ── */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+#topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 22px; background: var(--fundo-medio); border-bottom: 1px solid var(--divisoria); flex-shrink: 0; gap: 12px; }
+#page-title { font-size: 15px; font-weight: 600; color: var(--branco); flex: 1; }
+#period-controls { display: flex; align-items: center; gap: 8px; }
+#trimestre-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: rgba(16,185,129,.12); color: var(--verde-dest); white-space: nowrap; }
+#trimestre-range { font-size: 12px; color: var(--label); white-space: nowrap; }
+.arrow-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--divisoria); background: var(--bloco); color: var(--label); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all .12s; flex-shrink: 0; }
+.arrow-btn:hover { border-color: var(--verde); color: var(--verde-dest); background: rgba(16,185,129,.08); }
+.arrow-btn:disabled { opacity: .3; cursor: not-allowed; pointer-events: none; }
+
+/* ── CONTENT ── */
+#content { flex: 1; overflow-y: auto; padding: 16px; background: var(--fundo); }
+#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar-thumb { background: var(--divisoria); border-radius: 2px; }
+
+/* ── GRID DE 3 MESES ── */
+.trimestre-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; align-items: start; }
+.trimestre-bloco { margin-bottom: 24px; }
+.trimestre-bloco:last-child { margin-bottom: 0; }
+.trimestre-label { font-size: 11px; font-weight: 600; color: var(--txt-aux); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--divisoria); }
+
+/* ── BLOCO DE MÊS ── */
+.mes-section { background: var(--bloco); border: 1px solid var(--divisoria); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.mes-header { display: flex; align-items: baseline; gap: 6px; }
+.mes-titulo { font-size: 15px; font-weight: 700; color: var(--verde-dest); }
+.mes-ano    { font-size: 11px; color: var(--txt-aux); }
+.mes-empty  { font-size: 12px; color: var(--txt-aux); padding: 12px 0; }
+
+/* ── KPI CARDS ── */
+.kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.kpi { background: var(--fundo-medio); border: 1px solid var(--divisoria); border-radius: 8px; padding: 10px 12px; position: relative; overflow: hidden; }
+.kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--verde); }
+.kpi-label { font-size: 10px; color: var(--label); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi-value { font-size: 17px; font-weight: 700; color: var(--branco); }
+.kpi-sub   { font-size: 10px; color: var(--txt-aux); margin-top: 2px; }
+
+/* ── CARDS ── */
+.card { background: var(--fundo-medio); border: 1px solid var(--divisoria); border-radius: 8px; padding: 12px; }
+.card-title { font-size: 10px; font-weight: 600; color: var(--txt-aux); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px; }
+.chart-wrap { position: relative; }
+
+/* ── QUOTA BARS ── */
+.quota-row { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.quota-row:last-child { margin-bottom: 0; }
+.quota-name { font-size: 11px; color: var(--txt-claro); width: 60px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quota-bar-bg { flex: 1; height: 5px; background: var(--bloco); border-radius: 3px; overflow: hidden; }
+.quota-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.quota-pct { font-size: 10px; font-weight: 600; min-width: 30px; text-align: right; }
+.quota-badge { font-size: 9px; padding: 2px 6px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+.badge-green { background: rgba(16,185,129,.18); color: var(--verde-dest); }
+.badge-amber { background: rgba(245,158,11,.18); color: var(--ambar); }
+.badge-red   { background: rgba(239,68,68,.18);  color: #FCA5A5; }
+
+/* ── SETOR ── */
+.setor-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--divisoria); }
+.setor-row:last-child { border-bottom: none; }
+.setor-label { font-size: 11px; color: var(--label); }
+.setor-val   { font-size: 12px; font-weight: 600; color: var(--branco); }
+.setor-pct   { font-size: 10px; color: var(--txt-aux); margin-left: 3px; }
+
+/* ── COTA PROGRESS ── */
+.cota-bar-bg  { width: 100%; height: 8px; background: var(--bloco); border-radius: 4px; overflow: hidden; margin: 5px 0 3px; }
+.cota-bar-fill{ height: 100%; border-radius: 4px; transition: width .5s; }
+.cota-labels  { display: flex; justify-content: space-between; font-size: 10px; color: var(--txt-aux); }
+
+/* ── PUNIÇÕES ── */
+.punicao-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--divisoria); }
+.punicao-row:last-of-type { border-bottom: none; }
+.punicao-label { font-size: 11px; color: var(--label); }
+.punicao-val   { font-size: 11px; font-weight: 600; color: var(--txt-aux); }
+.punicao-ativa .punicao-label { color: var(--txt-claro); }
+.punicao-ativa .punicao-val   { color: #FCA5A5; }
+.punicao-total { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 0; margin-top: 6px; border-top: 1px solid var(--divisoria); font-size: 11px; font-weight: 600; color: var(--txt-claro); }
+
+/* ── ESTADO VAZIO ── */
+#no-data-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--txt-aux); }
+#no-data-msg p    { font-size: 14px; }
+#no-data-msg span { font-size: 12px; color: var(--divisoria); }

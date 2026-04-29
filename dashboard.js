@@ -291,7 +291,7 @@ function geralMesHTML(mes, uid) {
         <div class="kpi"><div class="kpi-label">Atendimentos</div><div class="kpi-value">${fmtNum(totalAts)}</div></div>
         <div class="kpi"><div class="kpi-label">CSAT médio</div><div class="kpi-value" style="color:#34D399">${fmtPct(csatM)}</div></div>
         <div class="kpi"><div class="kpi-label">Avaliações</div><div class="kpi-value">${fmtNum(totalNot)}</div></div>
-        <div class="kpi"><div class="kpi-label">Cota equipe</div><div class="kpi-value" style="color:#10B981">${fmtNum(totalPts)}<span style="font-size:11px;font-weight:400"> pts</span></div><div class="kpi-sub">${cotaEqPct}% da meta</div></div>
+        <div class="kpi"><div class="kpi-label">Pontos equipe</div><div class="kpi-value" style="color:#10B981">${fmtNum(totalPts)}<span style="font-size:11px;font-weight:400"> pts</span></div><div class="kpi-sub">${cotaEqPct}% da meta</div></div>
       </div>
       <div class="card">
         <div class="card-title">Avaliações por nota</div>

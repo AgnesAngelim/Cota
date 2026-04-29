@@ -26,7 +26,7 @@ const C = {
   bloco:'#1E293B', divisoria:'#334155', label:'#94A3B8',
 };
 
-// ── Navegação circular ───────────────────────────────────────────────────────
+// ── Navegação circular 
 function navNext() {
   if (currentPeriodo === -1) currentPeriodo = 0;
   else currentPeriodo = (currentPeriodo + 1) % TRIMESTRES.length;
@@ -39,7 +39,7 @@ function navPrev() {
   render();
 }
 
-// ── Leitura flexível de colunas ──────────────────────────────────────────────
+// ── Leitura flexível de colunas 
 function col(row, ...keys) {
   const rk = Object.keys(row);
   for (const k of keys) {
@@ -57,7 +57,7 @@ function colStr(row, ...keys) {
   return '';
 }
 
-// ── Parse Mês (Ordem) ────────────────────────────────────────────────────────
+// ── Parse Mês (Ordem) 
 function parseMesOrdem(valor) {
   if (!valor && valor !== 0) return null;
   const s = String(valor).trim();
@@ -96,7 +96,7 @@ function parseMesOrdem(valor) {
   return null;
 }
 
-// ── Detecta o ano mais recente da planilha ───────────────────────────────────
+// ── Detecta o ano mais recente da planilha
 function detectarAno(raw) {
   const anos = new Set();
   for (const r of raw) {
@@ -116,11 +116,7 @@ function anoAtual() {
   return Math.max(...allData.map(r => r.ano || 2026));
 }
 
-// ── Parse da planilha ────────────────────────────────────────────────────────
-// Colunas: Mês (Ordem) | Colaborador | Atendimentos | Cota (pts) | CSAT (%)
-//          TMA (min) | TME (min) | Cota 1..5 | Telecom | Club | Internacional
-//          Nota 1..5 | Atraso | Procedimento incorreto | Celular
-//          Omissão de atendimento | Uniforme
+// ── Parse da planilha 
 function parseRows(raw) {
   const anoAlvo = detectarAno(raw);
   const rows = [];
@@ -165,7 +161,7 @@ function parseRows(raw) {
   return rows;
 }
 
-// ── Sidebar dinâmica ─────────────────────────────────────────────────────────
+// ── Sidebar dinâmica 
 function buildSidebar() {
   members = [...new Set(allData.map(r => r.colaborador))].sort();
   document.getElementById('sb-colab-title').style.display = members.length ? '' : 'none';
@@ -186,7 +182,7 @@ function bindNavEvents() {
   });
 }
 
-// ── Topbar ───────────────────────────────────────────────────────────────────
+// ── Topbar 
 function getMesesAtivos() {
   return currentPeriodo === -1 ? TODOS_MESES : TRIMESTRES[currentPeriodo].meses;
 }
@@ -207,14 +203,14 @@ function updateTopbar() {
     (currentPeriodo === -1 ? 'Todos os meses' : TRIMESTRES[currentPeriodo].nome);
 }
 
-// ── Filtro ───────────────────────────────────────────────────────────────────
+// ── Filtro
 function fd(view, mes) {
   let d = allData;
   if (view !== 'geral') d = d.filter(r => r.colaborador.trim().toLowerCase() === view.trim().toLowerCase());
   return d.filter(r => r.mes === mes);
 }
 
-// ── Utilitários ──────────────────────────────────────────────────────────────
+// ── Utilitários 
 function sum(data, key) { return data.reduce((a, r) => a + (r[key] || 0), 0); }
 function avg(data, key) { return data.length ? sum(data, key) / data.length : 0; }
 function fmtNum(n)  { return Math.round(n).toLocaleString('pt-BR'); }
@@ -227,7 +223,7 @@ function quotaBadge(p) {
   return `<span class="quota-badge badge-red">✕ Abaixo</span>`;
 }
 
-// ── Gráficos ─────────────────────────────────────────────────────────────────
+// ── Gráficos 
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 function mkChart(id, cfg) {
   destroyChart(id);
@@ -256,7 +252,7 @@ function notasChart(id, dist) {
   });
 }
 
-// ── Card de um mês — GERAL ───────────────────────────────────────────────────
+// ── Card de um mês — GERAL
 function geralMesHTML(mes, uid) {
   const data = fd('geral', mes);
   const nm   = NOME_MES[mes];
@@ -316,7 +312,7 @@ function geralMesHTML(mes, uid) {
     </div>`;
 }
 
-// ── Card de um mês — INDIVIDUAL ──────────────────────────────────────────────
+// ── Card de um mês — INDIVIDUAL 
 function individualMesHTML(nome, mes, uid) {
   const data = fd(nome, mes);
   const nm   = NOME_MES[mes];
@@ -417,7 +413,7 @@ function individualMesHTML(nome, mes, uid) {
     </div>`;
 }
 
-// ── Render de um trimestre (3 colunas) ──────────────────────────────────────
+// ── Render de um trimestre (3 colunas) 
 function renderTrimestre(t, tIdx) {
   const htmlCols = currentView === 'geral'
     ? t.meses.map((mes, i) => geralMesHTML(mes, `${tIdx}_${i}`)).join('')
@@ -436,7 +432,7 @@ function drawCharts(t, tIdx) {
   });
 }
 
-// ── Render principal ─────────────────────────────────────────────────────────
+// ── Render principal 
 function render() {
   updateTopbar();
   const content = document.getElementById('content');
@@ -465,17 +461,21 @@ function render() {
     drawCharts(TRIMESTRES[currentPeriodo], currentPeriodo);
   }
 
+  const footer = document.createElement('div');
+  footer.id = 'footer';
+  footer.textContent = 'Feito por: Agnes Angelim';
+  content.appendChild(footer);
   content.scrollTop = 0;
 }
 
-// ── Eventos ──────────────────────────────────────────────────────────────────
+// ── Eventos 
 bindNavEvents();
 document.getElementById('btn-prev').addEventListener('click', navPrev);
 document.getElementById('btn-next').addEventListener('click', navNext);
 
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
-  e.target.value = ''; // limpa o input para permitir reenvio do mesmo arquivo
+  e.target.value = ''; 
   if (!file) return;
   const reader = new FileReader();
   reader.onload = evt => {

@@ -158,6 +158,8 @@ function parseRows(raw) {
       p_celular:     Math.abs(parseFloat(col(r,'celular')) || 0),
       p_omissao:     Math.abs(parseFloat(col(r,'omissao de atendimento','omissão de atendimento')) || 0),
       p_uniforme:    Math.abs(parseFloat(col(r,'uniforme')) || 0),
+      atend_presencial: parseFloat(col(r,'atendimento presencial','atendimentos presencial','atend. presencial','at. presencial')) || 0,
+      demanda_extra:    parseFloat(col(r,'demanda extra (whatsapp, envios, etc)','demanda extra','demanda extra (whatsapp)','demanda_extra')) || 0,
     });
   }
   return rows;
@@ -265,7 +267,9 @@ function geralMesHTML(mes, uid) {
     </div>`;
 
   const totalAts  = sum(data,'atendimentos');
-  const totalPts  = sum(data,'cota_pts');
+  const cotaBase  = sum(data,'cota_pts');
+  const ptsPres   = sum(data,'atend_presencial') * 200;
+  const totalPts  = cotaBase + ptsPres + sum(data,'demanda_extra');
   const csatM     = avg(data,'csat');
   const totalNot  = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const cotaEqPct = members.length ? Math.min(Math.round(totalPts/(META_COTA*members.length)*100),999) : 0;
@@ -273,7 +277,8 @@ function geralMesHTML(mes, uid) {
   const setorT = tel+clu+intl||1;
 
   const quotaRows = members.map(m => {
-    const pts = sum(fd(m,mes),'cota_pts');
+    const mData = fd(m,mes);
+    const pts = sum(mData,'cota_pts') + sum(mData,'atend_presencial') * 200 + sum(mData,'demanda_extra');
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>
@@ -322,7 +327,11 @@ function individualMesHTML(nome, mes, uid) {
     </div>`;
 
   const totalAts = sum(data,'atendimentos');
-  const cotaBruta= sum(data,'cota_pts');
+  const cotaBase = sum(data,'cota_pts');
+  const totalPresencial2  = sum(data,'atend_presencial');
+  const totalDemandaExtra = sum(data,'demanda_extra');
+  const ptsPres    = totalPresencial2 * 200;
+  const cotaBruta  = cotaBase + ptsPres + totalDemandaExtra;
   const csatM    = avg(data,'csat');
   const totalNot = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const pctGeral = ((totalAts/(sum(fd('geral',mes),'atendimentos')||1))*100).toFixed(1);
@@ -359,7 +368,7 @@ function individualMesHTML(nome, mes, uid) {
         <div class="kpi"><div class="kpi-label">Atendimentos</div><div class="kpi-value">${fmtNum(totalAts)}</div><div class="kpi-sub">${pctGeral}% da equipe</div></div>
         <div class="kpi"><div class="kpi-label">CSAT</div><div class="kpi-value" style="color:#34D399">${fmtPct(csatM)}</div></div>
         <div class="kpi"><div class="kpi-label">Avaliações</div><div class="kpi-value">${fmtNum(totalNot)}</div></div>
-        <div class="kpi"><div class="kpi-label">% cota líquida</div><div class="kpi-value" style="color:${color}">${cotaPct}%</div><div class="kpi-sub">${fmtNum(totalPts)} pts</div></div>
+        <div class="kpi"><div class="kpi-label">Cota líquida</div><div class="kpi-value" style="color:${color}">${fmtNum(totalPts)} pts</div><div class="kpi-sub">${cotaPct}% da meta</div></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
@@ -388,6 +397,21 @@ function individualMesHTML(nome, mes, uid) {
         <div class="punicao-total">
           <span>Total de descontos</span>
           <span style="color:${totalPunicao>0?'#FCA5A5':'#64748B'}">${totalPunicao>0?'−'+fmtNum(totalPunicao)+' pts':'Sem descontos'}</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Demanda extra</div>
+        <div class="setor-row">
+          <span class="setor-label">Atend. presencial</span>
+          <span class="setor-val">${fmtNum(totalPresencial2)} <span class="setor-pct">(${fmtNum(ptsPres)} pts)</span></span>
+        </div>
+        <div class="setor-row">
+          <span class="setor-label">Demanda extra (WhatsApp, chips, etc)</span>
+          <span class="setor-val">${fmtNum(totalDemandaExtra)}</span>
+        </div>
+        <div class="punicao-total" style="color:var(--verde-dest)">
+          <span>Total</span>
+          <span>+${fmtNum(ptsPres + totalDemandaExtra)} pts</span>
         </div>
       </div>
     </div>`;
@@ -451,6 +475,7 @@ document.getElementById('btn-next').addEventListener('click', navNext);
 
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
+  e.target.value = ''; // limpa o input para permitir reenvio do mesmo arquivo
   if (!file) return;
   const reader = new FileReader();
   reader.onload = evt => {

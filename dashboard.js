@@ -2,7 +2,7 @@ const META_COTA = 5000;
 let allData = [];
 let members = [];
 let currentView = 'geral';
-let currentPeriodo = -1; // -1 = todos os meses, 0..3 = trimestres
+let currentPeriodo = -1; 
 const charts = {};
 
 const TRIMESTRES = [
@@ -364,7 +364,7 @@ function individualMesHTML(nome, mes, uid) {
         <div class="kpi"><div class="kpi-label">Atendimentos</div><div class="kpi-value">${fmtNum(totalAts)}</div><div class="kpi-sub">${pctGeral}% da equipe</div></div>
         <div class="kpi"><div class="kpi-label">CSAT</div><div class="kpi-value" style="color:#34D399">${fmtPct(csatM)}</div></div>
         <div class="kpi"><div class="kpi-label">Avaliações</div><div class="kpi-value">${fmtNum(totalNot)}</div></div>
-        <div class="kpi"><div class="kpi-label">Cota líquida</div><div class="kpi-value" style="color:${color}">${fmtNum(totalPts)} pts</div><div class="kpi-sub">${cotaPct}% da meta</div></div>
+        <div class="kpi"><div class="kpi-label">Cota</div><div class="kpi-value" style="color:${color}">${fmtNum(totalPts)} pts</div><div class="kpi-sub">${cotaPct}% da meta</div></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">

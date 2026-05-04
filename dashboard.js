@@ -434,6 +434,15 @@ function drawCharts(t, tIdx) {
 
 // ── Render principal 
 function render() {
+  // Redireciona para monitoria se for a view selecionada
+  if (currentView === 'monitoria') {
+    document.getElementById('period-controls').style.display = 'none';
+    document.getElementById('page-title').textContent = 'Monitoria';
+    if (typeof monRender === 'function') monRender();
+    return;
+  }
+  document.getElementById('period-controls').style.display = '';
+
   updateTopbar();
   const content = document.getElementById('content');
 

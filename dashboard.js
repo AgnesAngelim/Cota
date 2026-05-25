@@ -2,7 +2,7 @@ const META_COTA = 5000;
 let allData = [];
 let members = [];
 let currentView = 'geral';
-let currentPeriodo = -1; 
+let currentPeriodo = -1; // -1 = todos os meses, 0..3 = trimestres
 const charts = {};
 
 const TRIMESTRES = [
@@ -24,6 +24,23 @@ const C = {
   verde:'#10B981', ciano:'#06B6D4', ambar:'#F59E0B',
   vermelho:'#EF4444', laranja:'#F97316',
   bloco:'#1E293B', divisoria:'#334155', label:'#94A3B8',
+};
+
+// ── Pontuações fixas da tabela de cota
+const PONTUACOES = {
+  whatsapp:      3,
+  transferencia: 1,
+  tme_25:        1,
+  tme_40:        0.5,
+  tme_1h:        0,
+  tme_alem:     -1.5,
+  nota1:        -5,
+  nota2:        -4,
+  nota3:        -3,
+  nota4:         4,
+  nota5:         5,
+  atend_presencial: 200,
+  demanda_extra:    5,
 };
 
 // ── Navegação circular 
@@ -156,6 +173,13 @@ function parseRows(raw) {
       p_uniforme:    Math.abs(parseFloat(col(r,'uniforme')) || 0),
       atend_presencial: parseFloat(col(r,'atendimento presencial','atendimentos presencial','atend. presencial','at. presencial')) || 0,
       demanda_extra:    parseFloat(col(r,'demanda extra (whatsapp, envios, etc)','demanda extra','demanda extra (whatsapp)','demanda_extra')) || 0,
+      monitoria:        parseFloat(col(r,'monitoria')) || 0,
+      whatsapp:         parseFloat(col(r,'atendimentos')) || 0,  // Whatsapp - Chat Huggy vem da coluna Atendimentos
+      transferencia:    parseFloat(col(r,'transferencia','transferência')) || 0,
+      tme_25:           parseFloat(col(r,'tme— até 25 min','tme - até 25 min','tme até 25 min','tme— até 25 min')) || 0,
+      tme_40:           parseFloat(col(r,'tme — até 40 min','tme - até 40 min','tme até 40 min')) || 0,
+      tme_1h:           parseFloat(col(r,'tme — até de 1 h','tme - até 1h','tme até 1h','tme — até 1 h')) || 0,
+      tme_alem:         parseFloat(col(r,'tme — além de 1h','tme - além de 1h','tme além de 1h')) || 0,
     });
   }
   return rows;
@@ -312,8 +336,9 @@ function geralMesHTML(mes, uid) {
     </div>`;
 }
 
-// ── Card de um mês — INDIVIDUAL 
-function individualMesHTML(nome, mes, uid) {
+// ── Card individual substituído pela nova versão com tabela de cota
+// (função definida abaixo junto com tabelaCotaHTML)
+function individualMesHTML_OLD_UNUSED(nome, mes, uid) {
   const data = fd(nome, mes);
   const nm   = NOME_MES[mes];
   if (!data.length) return `
@@ -364,7 +389,7 @@ function individualMesHTML(nome, mes, uid) {
         <div class="kpi"><div class="kpi-label">Atendimentos</div><div class="kpi-value">${fmtNum(totalAts)}</div><div class="kpi-sub">${pctGeral}% da equipe</div></div>
         <div class="kpi"><div class="kpi-label">CSAT</div><div class="kpi-value" style="color:#34D399">${fmtPct(csatM)}</div></div>
         <div class="kpi"><div class="kpi-label">Avaliações</div><div class="kpi-value">${fmtNum(totalNot)}</div></div>
-        <div class="kpi"><div class="kpi-label">Cota</div><div class="kpi-value" style="color:${color}">${fmtNum(totalPts)} pts</div><div class="kpi-sub">${cotaPct}% da meta</div></div>
+        <div class="kpi"><div class="kpi-label">Cota líquida</div><div class="kpi-value" style="color:${color}">${fmtNum(totalPts)} pts</div><div class="kpi-sub">${cotaPct}% da meta</div></div>
       </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
@@ -413,12 +438,201 @@ function individualMesHTML(nome, mes, uid) {
     </div>`;
 }
 
-// ── Render de um trimestre (3 colunas) 
+// ── Tabela de composição de cota individual ──────────────────────────────────
+function tabelaCotaHTML(data, uid) {
+  function linha(label, feito, pts, destaque) {
+    const cota = feito * pts;
+    const cor  = cota < 0 ? '#FCA5A5' : cota > 0 ? '#CBD5E1' : '#64748B';
+    const cls  = destaque ? ' cota-linha-total' : '';
+    return `<tr class="cota-linha${cls}">
+      <td>${label}</td>
+      <td style="text-align:right;color:#94A3B8">${pts > 0 ? '+' : ''}${pts}</td>
+      <td style="text-align:right;color:#CBD5E1">${fmtNum(feito)}</td>
+      <td style="text-align:right;color:${cor};font-weight:600">${cota >= 0 ? '' : ''}${fmtNum(cota)}</td>
+    </tr>`;
+  }
+
+  const d = data;
+  const w  = sum(d,'whatsapp'),   tr = sum(d,'transferencia');
+  const t25= sum(d,'tme_25'),    t40= sum(d,'tme_40');
+  const t1h= sum(d,'tme_1h'),    tal= sum(d,'tme_alem');
+  const n1 = sum(d,'nota1'),     n2 = sum(d,'nota2');
+  const n3 = sum(d,'nota3'),     n4 = sum(d,'nota4'), n5 = sum(d,'nota5');
+  const pr = sum(d,'atend_presencial'), de = sum(d,'demanda_extra'), mo = sum(d,'monitoria');
+
+  // Soma de pontos referente ao setor (campo preenchível no modal — lemos do localStorage)
+  const pontosSetor = getPontosSetor(uid);
+
+  const cotaBase =
+    w*3 + tr*1 + t25*1 + t40*0.5 + t1h*0 + tal*(-1.5) +
+    n1*(-5) + n2*(-4) + n3*(-3) + n4*4 + n5*5 +
+    pr*200 + de*5 + mo;
+
+  const cotaTotal = cotaBase + pontosSetor;
+
+  return `<table class="cota-tabela">
+    <thead>
+      <tr>
+        <th>Atendimentos / Tratativas</th>
+        <th style="text-align:right">Pontuação</th>
+        <th style="text-align:right">Feito</th>
+        <th style="text-align:right">Cota</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${linha('Whatsapp - Chat Huggy', w, 3)}
+      ${linha('Transferências', tr, 1)}
+      ${linha('TME — Até 25 min', t25, 1)}
+      ${linha('TME — Até 40 min', t40, 0.5)}
+      ${linha('TME — Até 1h', t1h, 0)}
+      ${linha('TME — Além de 1h', tal, -1.5)}
+      ${linha('(NPS) Nota 1', n1, -5)}
+      ${linha('(NPS) Nota 2', n2, -4)}
+      ${linha('(NPS) Nota 3', n3, -3)}
+      ${linha('(NPS) Nota 4', n4, 4)}
+      ${linha('(NPS) Nota 5', n5, 5)}
+      ${linha('Atendimento Presencial', pr, 200)}
+      ${linha('Demanda extra', de, 5)}
+      <tr class="cota-linha"><td>Monitoria</td><td style="text-align:right;color:#94A3B8">—</td><td style="text-align:right;color:#CBD5E1">${fmtNum(mo)}</td><td style="text-align:right;color:${mo>=0?'#CBD5E1':'#FCA5A5'};font-weight:600">${fmtNum(mo)}</td></tr>
+      <tr class="cota-linha-setor">
+        <td>Pontos Ref. ao setor</td>
+        <td style="text-align:right;color:#94A3B8">—</td>
+        <td style="text-align:right;color:#CBD5E1">—</td>
+        <td style="text-align:right">
+          <input class="cota-setor-input" data-uid="${uid}" type="number" value="${pontosSetor}" placeholder="0" step="0.5">
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr class="cota-linha-total">
+        <td colspan="3">Total de pontos</td>
+        <td style="text-align:right;color:${cotaTotal>=5000?'#10B981':cotaTotal>=3000?'#F59E0B':'#EF4444'};font-size:14px;font-weight:700" id="cota-total-${uid}">${fmtNum(cotaTotal)} pts</td>
+      </tr>
+    </tfoot>
+  </table>`;
+}
+
+// Pontos referente ao setor — salvo no localStorage por uid
+function getPontosSetor(uid) {
+  try { return parseFloat(localStorage.getItem('cota_setor_' + uid) || '0') || 0; }
+  catch { return 0; }
+}
+function setPontosSetor(uid, val) {
+  try { localStorage.setItem('cota_setor_' + uid, val); } catch {}
+}
+
+// Bind dos inputs de pontos de setor após render
+function bindCotaSetorInputs() {
+  document.querySelectorAll('.cota-setor-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const uid = inp.dataset.uid;
+      const val = parseFloat(inp.value) || 0;
+      setPontosSetor(uid, val);
+      // Recalcula o total na linha
+      const totalEl = document.getElementById('cota-total-' + uid);
+      if (!totalEl) return;
+      // Pega os dados da view atual
+      const [tIdx, mIdx] = uid.split('_').map(Number);
+      const mes = currentPeriodo === -1
+        ? TODOS_MESES[tIdx * 3 + mIdx]
+        : TRIMESTRES[currentPeriodo].meses[mIdx];
+      const data = fd(currentView, mes);
+      const w  = sum(data,'whatsapp'),   tr2 = sum(data,'transferencia');
+      const t25= sum(data,'tme_25'),    t40 = sum(data,'tme_40');
+      const t1h= sum(data,'tme_1h'),    tal = sum(data,'tme_alem');
+      const n1 = sum(data,'nota1'),     n2  = sum(data,'nota2');
+      const n3 = sum(data,'nota3'),     n4  = sum(data,'nota4'), n5 = sum(data,'nota5');
+      const pr = sum(data,'atend_presencial'), de = sum(data,'demanda_extra');
+      const base = w*3+tr2*1+t25*1+t40*0.5+t1h*0+tal*(-1.5)+n1*(-5)+n2*(-4)+n3*(-3)+n4*4+n5*5+pr*200+de*5;
+      const total = base + val;
+      const cor = total >= 5000 ? '#10B981' : total >= 3000 ? '#F59E0B' : '#EF4444';
+      totalEl.textContent = fmtNum(total) + ' pts';
+      totalEl.style.color = cor;
+    });
+  });
+}
+
+// ── Card individual — novo layout com tabela de cota ─────────────────────────
+function individualMesHTML(nome, mes, uid) {
+  const data = fd(nome, mes);
+  const nm   = NOME_MES[mes];
+  if (!data.length) return `
+    <div class="mes-section">
+      <div class="mes-header"><span class="mes-titulo">${nm}</span><span class="mes-ano">${anoAtual()}</span></div>
+      <div class="mes-empty">Sem dados para ${nm}</div>
+    </div>`;
+
+  const totalAts = sum(data,'atendimentos');
+  const csatM    = avg(data,'csat');
+  const totalNot = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
+  const pctGeral = ((totalAts/(sum(fd('geral',mes),'atendimentos')||1))*100).toFixed(1);
+
+  const pun = {
+    atraso:      sum(data,'p_atraso'),
+    procedimento:sum(data,'p_procedimento'),
+    celular:     sum(data,'p_celular'),
+    omissao:     sum(data,'p_omissao'),
+    uniforme:    sum(data,'p_uniforme'),
+  };
+  const totalPunicao = Object.values(pun).reduce((a,v)=>a+v,0);
+
+  const punicaoRows = [
+    { label:'Atraso',                 val: pun.atraso        },
+    { label:'Procedimento incorreto', val: pun.procedimento  },
+    { label:'Celular',                val: pun.celular       },
+    { label:'Omissão de atendimento', val: pun.omissao       },
+    { label:'Uniforme',               val: pun.uniforme      },
+  ].filter(p => p.val > 0).map(p => `
+    <div class="punicao-row punicao-ativa">
+      <span class="punicao-label">${p.label}</span>
+      <span class="punicao-val">−${fmtNum(p.val)} pts</span>
+    </div>`).join('') || `<div class="punicao-row"><span class="punicao-label" style="color:#64748B">Sem descontos</span></div>`;
+
+  // Cota total = base calculada pela tabela + pontos setor
+  const cotaBase = sum(data,'whatsapp')*3 + sum(data,'transferencia')*1 +
+    sum(data,'tme_25')*1 + sum(data,'tme_40')*0.5 + sum(data,'tme_1h')*0 + sum(data,'tme_alem')*(-1.5) +
+    sum(data,'nota1')*(-5) + sum(data,'nota2')*(-4) + sum(data,'nota3')*(-3) + sum(data,'nota4')*4 + sum(data,'nota5')*5 +
+    sum(data,'atend_presencial')*200 + sum(data,'demanda_extra')*5;
+  const pontosSetor = getPontosSetor(uid);
+  const cotaTotal   = cotaBase + pontosSetor;
+  const cotaPts     = sum(data,'cota_pts');
+  const pctMeta     = (cotaPts / META_COTA * 100).toFixed(1);
+  const corMeta     = cotaPts >= META_COTA ? '#10B981' : cotaPts >= META_COTA * 0.6 ? '#F59E0B' : '#EF4444';
+  const totalWhats  = sum(data,'whatsapp');
+
+  return `
+    <div class="mes-section ind-mes">
+      <div class="mes-header"><span class="mes-titulo">${nm}</span><span class="mes-ano">${anoAtual()}</span></div>
+      <div class="kpi-row kpi-row-6">
+        <div class="kpi"><div class="kpi-label">Whatsapp</div><div class="kpi-value">${fmtNum(totalWhats)}</div></div>
+        <div class="kpi"><div class="kpi-label">C-SAT</div><div class="kpi-value">${fmtPct(csatM)}</div></div>
+        <div class="kpi"><div class="kpi-label">Meta</div><div class="kpi-value">${fmtNum(META_COTA)}</div></div>
+        <div class="kpi"><div class="kpi-label">% Meta</div><div class="kpi-value" style="color:${corMeta}">${pctMeta}%</div></div>
+        <div class="kpi"><div class="kpi-label">Punições</div><div class="kpi-value" style="color:${totalPunicao>0?'#FCA5A5':'#94A3B8'}">${totalPunicao>0?'−'+fmtNum(totalPunicao):' — '}</div></div>
+        <div class="kpi"><div class="kpi-label">Cota final</div><div class="kpi-value">${fmtNum(Math.max(sum(data,'cota_pts') - totalPunicao, 0))}</div><div class="kpi-sub">líquida − punições</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Composição da cota</div>
+        ${tabelaCotaHTML(data, uid)}
+      </div>
+      ${totalPunicao > 0 ? `
+      <div class="card">
+        <div class="card-title">Descontos por ocorrência</div>
+        ${punicaoRows}
+        <div class="punicao-total"><span>Total de descontos</span><span style="color:#FCA5A5">−${fmtNum(totalPunicao)} pts</span></div>
+      </div>` : ''}
+    </div>`;
+}
+
+// ── Render de trimestre (modo geral = 3 colunas, modo individual = empilhado) 
 function renderTrimestre(t, tIdx) {
-  const htmlCols = currentView === 'geral'
-    ? t.meses.map((mes, i) => geralMesHTML(mes, `${tIdx}_${i}`)).join('')
-    : t.meses.map((mes, i) => individualMesHTML(currentView, mes, `${tIdx}_${i}`)).join('');
-  return `<div class="trimestre-grid">${htmlCols}</div>`;
+  if (currentView === 'geral') {
+    const htmlCols = t.meses.map((mes, i) => geralMesHTML(mes, `${tIdx}_${i}`)).join('');
+    return `<div class="trimestre-grid">${htmlCols}</div>`;
+  } else {
+    // Individual: meses empilhados verticalmente
+    return t.meses.map((mes, i) => individualMesHTML(currentView, mes, `${tIdx}_${i}`)).join('');
+  }
 }
 
 function drawCharts(t, tIdx) {
@@ -475,6 +689,11 @@ function render() {
   footer.textContent = 'Feito por: Agnes Angelim';
   content.appendChild(footer);
   content.scrollTop = 0;
+
+  // Bind inputs de pontos de setor (visão individual)
+  if (currentView !== 'geral' && currentView !== 'monitoria') {
+    setTimeout(bindCotaSetorInputs, 50);
+  }
 }
 
 // ── Eventos 

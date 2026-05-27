@@ -299,9 +299,7 @@ function geralMesHTML(mes, uid) {
     </div>`;
 
   const totalAts  = sum(data,'atendimentos');
-  const cotaBase  = sum(data,'cota_pts');
-  const ptsPres   = sum(data,'atend_presencial') * 200;
-  const totalPts  = cotaBase + ptsPres + sum(data,'demanda_extra');
+  const totalPts  = sum(data,'cota_pts'); // soma direta da coluna Cota (pts)
   const csatM     = avg(data,'csat');
   const totalNot  = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const cotaEqPct = members.length ? Math.min(Math.round(totalPts/(META_COTA*members.length)*100),999) : 0;
@@ -310,7 +308,7 @@ function geralMesHTML(mes, uid) {
 
   const quotaRows = members.map(m => {
     const mData = fd(m,mes);
-    const pts = sum(mData,'cota_pts') + sum(mData,'atend_presencial') * 200 + sum(mData,'demanda_extra');
+    const pts = sum(mData,'cota_pts'); // soma direta da coluna Cota (pts)
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>

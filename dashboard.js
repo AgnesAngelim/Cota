@@ -185,6 +185,7 @@ function parseRows(raw) {
       atend_presencial: parseFloat(col(r,'atendimento presencial','atendimentos presencial','atend. presencial','at. presencial')) || 0,
       demanda_extra:    parseFloat(col(r,'demanda extra (whatsapp, envios, etc)','demanda extra','demanda extra (whatsapp)','demanda_extra')) || 0,
       monitoria:        parseFloat(col(r,'monitoria')) || 0,
+      pontos_setor:     parseFloat(col(r,'pontos ref. ao setor','pontos ref ao setor','pontos referente ao setor')) || 0,
       whatsapp:         parseFloat(col(r,'atendimentos')) || 0,  // Whatsapp - Chat Huggy vem da coluna Atendimentos
       transferencia:    parseFloat(col(r,'transferencia','transferência')) || 0,
       tme_25:           parseFloat(col(r,'tme- ate 25 min','tme — até 25 min','tme— até 25 min','tme - ate 25 min')) || 0,
@@ -471,8 +472,8 @@ function tabelaCotaHTML(data, uid) {
   const n3 = sum(d,'nota3'),     n4 = sum(d,'nota4'), n5 = sum(d,'nota5');
   const pr = sum(d,'atend_presencial'), de = sum(d,'demanda_extra'), mo = sum(d,'monitoria');
 
-  // Soma de pontos referente ao setor (campo preenchível no modal — lemos do localStorage)
-  const pontosSetor = getPontosSetor(uid);
+  // Pontos referente ao setor — vem da coluna da planilha
+  const pontosSetor = sum(d, 'pontos_setor');
 
   const cotaBase =
     w*3 + tr*1 + t25*1 + t40*0.5 + t1h*0 + tal*(-1.5) +
@@ -509,9 +510,7 @@ function tabelaCotaHTML(data, uid) {
         <td>Pontos Ref. ao setor</td>
         <td style="text-align:right;color:#94A3B8">—</td>
         <td style="text-align:right;color:#CBD5E1">—</td>
-        <td style="text-align:right">
-          <input class="cota-setor-input" data-uid="${uid}" type="number" value="${pontosSetor}" placeholder="0" step="0.5">
-        </td>
+        <td style="text-align:right;color:${pontosSetor<0?'#FCA5A5':'#CBD5E1'};font-weight:600">${pontosSetor !== 0 ? fmtNum(pontosSetor) : '—'}</td>
       </tr>
     </tbody>
     <tfoot>
@@ -523,48 +522,7 @@ function tabelaCotaHTML(data, uid) {
   </table>`;
 }
 
-// Pontos referente ao setor — salvo no localStorage por uid
-function getPontosSetor(uid) {
-  try { return parseFloat(localStorage.getItem('cota_setor_' + uid) || '0') || 0; }
-  catch { return 0; }
-}
-function setPontosSetor(uid, val) {
-  try { localStorage.setItem('cota_setor_' + uid, val); } catch {}
-}
-
-// Bind dos inputs de pontos de setor após render
-function bindCotaSetorInputs() {
-  document.querySelectorAll('.cota-setor-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const uid = inp.dataset.uid;
-      const val = parseFloat(inp.value) || 0;
-      setPontosSetor(uid, val);
-      // Recalcula o total na linha
-      const totalEl = document.getElementById('cota-total-' + uid);
-      if (!totalEl) return;
-      // Pega os dados da view atual
-      // uid formato: NomeColaborador_tIdx_mIdx  (ou tIdx_mIdx para geral)
-      const parts = uid.split('_');
-      const mIdx = parseInt(parts[parts.length - 1]);
-      const tIdx2 = parseInt(parts[parts.length - 2]);
-      const mes = currentPeriodo === -1
-        ? TODOS_MESES[tIdx2 * 3 + mIdx]
-        : TRIMESTRES[currentPeriodo].meses[mIdx];
-      const data = fd(currentView, mes);
-      const w  = sum(data,'whatsapp'),   tr2 = sum(data,'transferencia');
-      const t25= sum(data,'tme_25'),    t40 = sum(data,'tme_40');
-      const t1h= sum(data,'tme_1h'),    tal = sum(data,'tme_alem');
-      const n1 = sum(data,'nota1'),     n2  = sum(data,'nota2');
-      const n3 = sum(data,'nota3'),     n4  = sum(data,'nota4'), n5 = sum(data,'nota5');
-      const pr = sum(data,'atend_presencial'), de = sum(data,'demanda_extra');
-      const base = w*3+tr2*1+t25*1+t40*0.5+t1h*0+tal*(-1.5)+n1*(-5)+n2*(-4)+n3*(-3)+n4*4+n5*5+pr*200+de*5;
-      const total = base + val;
-      const cor = total >= 5000 ? '#10B981' : total >= 3000 ? '#F59E0B' : '#EF4444';
-      totalEl.textContent = fmtNum(total) + ' pts';
-      totalEl.style.color = cor;
-    });
-  });
-}
+// Pontos Ref. ao setor vêm da coluna 'Pontos Ref. ao setor' da planilha
 
 // ── Card individual — novo layout com tabela de cota ─────────────────────────
 function individualMesHTML(nome, mes, uid) {
@@ -607,7 +565,7 @@ function individualMesHTML(nome, mes, uid) {
     sum(data,'tme_25')*1 + sum(data,'tme_40')*0.5 + sum(data,'tme_1h')*0 + sum(data,'tme_alem')*(-1.5) +
     sum(data,'nota1')*(-5) + sum(data,'nota2')*(-4) + sum(data,'nota3')*(-3) + sum(data,'nota4')*4 + sum(data,'nota5')*5 +
     sum(data,'atend_presencial')*200 + sum(data,'demanda_extra')*5;
-  const pontosSetor = getPontosSetor(uid);
+  const pontosSetor = sum(data, 'pontos_setor');
   const cotaTotal   = cotaBase + pontosSetor;
   const cotaPts     = sum(data,'cota_pts');
   const pctMeta     = (cotaPts / META_COTA * 100).toFixed(1);
@@ -707,10 +665,7 @@ function render() {
   content.appendChild(footer);
   content.scrollTop = 0;
 
-  // Bind inputs de pontos de setor (visão individual)
-  if (currentView !== 'geral' && currentView !== 'monitoria') {
-    setTimeout(bindCotaSetorInputs, 50);
-  }
+
 }
 
 // ── Eventos 

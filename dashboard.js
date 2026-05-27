@@ -57,10 +57,19 @@ function navPrev() {
 }
 
 // ── Leitura flexível de colunas 
+// Normaliza string: minúsculas, sem acentos, sem espaços extras, travessão→hífen
+function normalizeKey(s) {
+  return String(s).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/[\u2014\u2013\u2012]/g, '-')           // travessão → hífen
+    .replace(/\s+/g, ' ');                              // espaços múltiplos → um
+}
+
 function col(row, ...keys) {
   const rk = Object.keys(row);
   for (const k of keys) {
-    const f = rk.find(r => r.trim().toLowerCase() === k.toLowerCase());
+    const nk = normalizeKey(k);
+    const f = rk.find(r => normalizeKey(r) === nk);
     if (f !== undefined && row[f] !== undefined && row[f] !== '') return row[f];
   }
   return 0;
@@ -68,7 +77,8 @@ function col(row, ...keys) {
 function colStr(row, ...keys) {
   const rk = Object.keys(row);
   for (const k of keys) {
-    const f = rk.find(r => r.trim().toLowerCase() === k.toLowerCase());
+    const nk = normalizeKey(k);
+    const f = rk.find(r => normalizeKey(r) === nk);
     if (f !== undefined && row[f] !== undefined && row[f] !== '') return String(row[f]);
   }
   return '';
@@ -77,9 +87,10 @@ function colStr(row, ...keys) {
 // ── Parse Mês (Ordem) 
 function parseMesOrdem(valor) {
   if (!valor && valor !== 0) return null;
-  const s = String(valor).trim();
+  // Remove espaços, caracteres invisíveis e normaliza
+  const s = String(valor).trim().replace(/[\u00A0\u200B\uFEFF]/g, '');
 
-  // AAAA-MM ou AAAA/MM
+  // AAAA-MM ou AAAA/MM  (ex: "2026-05", "2026/05")
   let m = s.match(/^(\d{4})[-\/](\d{1,2})$/);
   if (m) return { ano: parseInt(m[1]), mes: parseInt(m[2]) };
 
@@ -118,7 +129,7 @@ function detectarAno(raw) {
   const anos = new Set();
   for (const r of raw) {
     const rk = Object.keys(r);
-    const colOrdem = rk.find(k => k.trim().toLowerCase() === 'mês (ordem)' || k.trim().toLowerCase() === 'mes (ordem)');
+    const colOrdem = rk.find(k => normalizeKey(k) === 'mes (ordem)' || normalizeKey(k) === 'mes(ordem)' || normalizeKey(k) === 'refmes (ordem)');
     const ordemRaw = colOrdem ? String(r[colOrdem]).trim() : '';
     if (!ordemRaw) continue;
     const parsed = parseMesOrdem(ordemRaw);
@@ -139,7 +150,7 @@ function parseRows(raw) {
   const rows = [];
   for (const r of raw) {
     const rk = Object.keys(r);
-    const colOrdem = rk.find(k => k.trim().toLowerCase() === 'mês (ordem)' || k.trim().toLowerCase() === 'mes (ordem)');
+    const colOrdem = rk.find(k => normalizeKey(k) === 'mes (ordem)' || normalizeKey(k) === 'mes(ordem)' || normalizeKey(k) === 'refmes (ordem)');
     const ordemRaw = colOrdem ? String(r[colOrdem]).trim() : colStr(r, 'mês(ordem)', 'mes(ordem)', 'refmês (ordem)', 'refmes (ordem)');
     const parsed = parseMesOrdem(ordemRaw);
     if (!parsed || parsed.ano !== anoAlvo) continue;
@@ -176,10 +187,10 @@ function parseRows(raw) {
       monitoria:        parseFloat(col(r,'monitoria')) || 0,
       whatsapp:         parseFloat(col(r,'atendimentos')) || 0,  // Whatsapp - Chat Huggy vem da coluna Atendimentos
       transferencia:    parseFloat(col(r,'transferencia','transferência')) || 0,
-      tme_25:           parseFloat(col(r,'tme— até 25 min','tme - até 25 min','tme até 25 min','tme— até 25 min')) || 0,
-      tme_40:           parseFloat(col(r,'tme — até 40 min','tme - até 40 min','tme até 40 min')) || 0,
-      tme_1h:           parseFloat(col(r,'tme — até de 1 h','tme - até 1h','tme até 1h','tme — até 1 h')) || 0,
-      tme_alem:         parseFloat(col(r,'tme — além de 1h','tme - além de 1h','tme além de 1h')) || 0,
+      tme_25:           parseFloat(col(r,'tme- ate 25 min','tme — até 25 min','tme— até 25 min','tme - ate 25 min')) || 0,
+      tme_40:           parseFloat(col(r,'tme - ate 40 min','tme — até 40 min','tme - até 40 min')) || 0,
+      tme_1h:           parseFloat(col(r,'tme - ate de 1 h','tme — até de 1 h','tme - ate 1h','tme - até 1h')) || 0,
+      tme_alem:         parseFloat(col(r,'tme - alem de 1h','tme — além de 1h','tme - além de 1h')) || 0,
     });
   }
   return rows;
@@ -532,9 +543,12 @@ function bindCotaSetorInputs() {
       const totalEl = document.getElementById('cota-total-' + uid);
       if (!totalEl) return;
       // Pega os dados da view atual
-      const [tIdx, mIdx] = uid.split('_').map(Number);
+      // uid formato: NomeColaborador_tIdx_mIdx  (ou tIdx_mIdx para geral)
+      const parts = uid.split('_');
+      const mIdx = parseInt(parts[parts.length - 1]);
+      const tIdx2 = parseInt(parts[parts.length - 2]);
       const mes = currentPeriodo === -1
-        ? TODOS_MESES[tIdx * 3 + mIdx]
+        ? TODOS_MESES[tIdx2 * 3 + mIdx]
         : TRIMESTRES[currentPeriodo].meses[mIdx];
       const data = fd(currentView, mes);
       const w  = sum(data,'whatsapp'),   tr2 = sum(data,'transferencia');
@@ -631,13 +645,16 @@ function renderTrimestre(t, tIdx) {
     return `<div class="trimestre-grid">${htmlCols}</div>`;
   } else {
     // Individual: meses empilhados verticalmente
-    return t.meses.map((mes, i) => individualMesHTML(currentView, mes, `${tIdx}_${i}`)).join('');
+    // uid inclui o nome do colaborador para separar os pontos de setor por pessoa
+    const safeNome = currentView.replace(/[^a-zA-Z0-9]/g, '_');
+    return t.meses.map((mes, i) => individualMesHTML(currentView, mes, `${safeNome}_${tIdx}_${i}`)).join('');
   }
 }
 
 function drawCharts(t, tIdx) {
   t.meses.forEach((mes, i) => {
-    const uid  = `${tIdx}_${i}`;
+    const safeNome = currentView.replace(/[^a-zA-Z0-9]/g, '_');
+    const uid  = currentView === 'geral' ? `${tIdx}_${i}` : `${safeNome}_${tIdx}_${i}`;
     const data = currentView === 'geral' ? fd('geral', mes) : fd(currentView, mes);
     if (!data.length) return;
     const dist = [sum(data,'nota1'),sum(data,'nota2'),sum(data,'nota3'),sum(data,'nota4'),sum(data,'nota5')];

@@ -29,7 +29,7 @@ const C = {
 
 // ── Pontuações fixas da aba Agnes
 const AGNES_PONTUACOES = {
-  'melhoria nos processos atendimentos': 150,
+  'melhoria nos processos atendimentos': 200,
   'ajustes e melhorias de relatorios':   500,
   'prevencao a fraudes':                 300,
   'gerenciamento licencas telecom':      250,

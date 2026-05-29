@@ -1,5 +1,6 @@
 const META_COTA = 5000;
 let allData = [];
+let agnesData = []; // dados da aba Agnes (projetos extras)
 let members = [];
 let currentView = 'geral';
 let currentPeriodo = -1; // -1 = todos os meses, 0..3 = trimestres
@@ -24,6 +25,20 @@ const C = {
   verde:'#10B981', ciano:'#06B6D4', ambar:'#F59E0B',
   vermelho:'#EF4444', laranja:'#F97316',
   bloco:'#1E293B', divisoria:'#334155', label:'#94A3B8',
+};
+
+// ── Pontuações fixas da aba Agnes
+const AGNES_PONTUACOES = {
+  'melhoria nos processos atendimentos': 150,
+  'ajustes e melhorias de relatorios':   500,
+  'prevencao a fraudes':                 500,
+  'gerenciamento licencas telecom':      250,
+  'gerenciamento base de clientes':      250,
+  'analise de kpis':                     250,
+  'alto':                                1500,
+  'medio':                               1000,
+  'baixo':                               500,
+  'relatorios paralelos':                100,
 };
 
 // ── Pontuações fixas da tabela de cota
@@ -197,6 +212,49 @@ function parseRows(raw) {
   return rows;
 }
 
+// ── Parse da aba Agnes ───────────────────────────────────────────────────────
+function parseAgnesRows(raw) {
+  // Tenta encontrar coluna de mês — se não achar, usa todas as linhas sem filtro de mês
+  const results = [];
+  raw.forEach(r => {
+    // Tenta várias variações de nome de coluna para o mês
+    const mesRaw = colStr(r,
+      'mês (ordem)', 'mes (ordem)', 'mês(ordem)', 'mes(ordem)',
+      'refmês (ordem)', 'refmes (ordem)', 'mês ref', 'mes ref',
+      'mês', 'mes', 'month', 'período', 'periodo'
+    );
+    const parsed = mesRaw ? parseMesOrdem(mesRaw) : null;
+    const row = {
+      mes: parsed ? parsed.mes : 0,
+      ano: parsed ? parsed.ano : anoAtual(),
+    };
+    Object.keys(AGNES_PONTUACOES).forEach(campo => {
+      row[campo] = parseFloat(col(r, campo)) || 0;
+    });
+    // Só inclui se ao menos um campo tem valor
+    const temValor = Object.keys(AGNES_PONTUACOES).some(c => row[c] > 0);
+    if (temValor) results.push(row);
+  });
+  return results;
+}
+
+function getAgnesTotalMes(mes) {
+  // Se houver linhas sem mês (mes=0), inclui em todos os meses
+  const rows = agnesData.filter(r => r.mes === mes || r.mes === 0);
+  if (!rows.length) return { total: 0, linhas: [] };
+  let total = 0;
+  const linhas = [];
+  Object.entries(AGNES_PONTUACOES).forEach(([campo, pts]) => {
+    const feito = rows.reduce((a, r) => a + (r[campo] || 0), 0);
+    const valor = feito * pts;
+    if (feito > 0) {
+      linhas.push({ campo, feito, pts, valor });
+      total += valor;
+    }
+  });
+  return { total, linhas };
+}
+
 // ── Sidebar dinâmica 
 function buildSidebar() {
   members = [...new Set(allData.map(r => r.colaborador))].sort();
@@ -299,7 +357,9 @@ function geralMesHTML(mes, uid) {
     </div>`;
 
   const totalAts  = sum(data,'atendimentos');
-  const totalPts  = sum(data,'cota_pts'); // soma direta da coluna Cota (pts)
+  const totalPtsSemAgnes = sum(data,'cota_pts'); // soma direta da coluna Cota (pts)
+  const { total: agnesTotalGeral } = getAgnesTotalMes(mes);
+  const totalPts = totalPtsSemAgnes + agnesTotalGeral;
   const csatM     = avg(data,'csat');
   const totalNot  = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const cotaEqPct = members.length ? Math.min(Math.round(totalPts/(META_COTA*members.length)*100),999) : 0;
@@ -308,7 +368,8 @@ function geralMesHTML(mes, uid) {
 
   const quotaRows = members.map(m => {
     const mData = fd(m,mes);
-    const pts = sum(mData,'cota_pts'); // soma direta da coluna Cota (pts)
+    const agnesExtra = m.trim().toLowerCase() === 'agnes' ? getAgnesTotalMes(mes).total : 0;
+    const pts = sum(mData,'cota_pts') + agnesExtra; // soma direta da coluna Cota (pts)
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>
@@ -449,8 +510,10 @@ function individualMesHTML_OLD_UNUSED(nome, mes, uid) {
 }
 
 // ── Tabela de composição de cota individual ──────────────────────────────────
-function tabelaCotaHTML(data, uid) {
+function tabelaCotaHTML(data, uid, ocultarZeros) {
   function linha(label, feito, pts, destaque) {
+    // Se ocultarZeros=true (Agnes), oculta linhas com feito=0
+    if (ocultarZeros && feito === 0) return '';
     const cota = feito * pts;
     const cor  = cota < 0 ? '#FCA5A5' : cota > 0 ? '#CBD5E1' : '#64748B';
     const cls  = destaque ? ' cota-linha-total' : '';
@@ -503,13 +566,8 @@ function tabelaCotaHTML(data, uid) {
       ${linha('(NPS) Nota 5', n5, 5)}
       ${linha('Atendimento Presencial', pr, 200)}
       ${linha('Demanda extra', de, 5)}
-      <tr class="cota-linha"><td>Monitoria</td><td style="text-align:right;color:#94A3B8">—</td><td style="text-align:right;color:#CBD5E1">${fmtNum(mo)}</td><td style="text-align:right;color:${mo>=0?'#CBD5E1':'#FCA5A5'};font-weight:600">${fmtNum(mo)}</td></tr>
-      <tr class="cota-linha-setor">
-        <td>Pontos Ref. ao setor</td>
-        <td style="text-align:right;color:#94A3B8">—</td>
-        <td style="text-align:right;color:#CBD5E1">—</td>
-        <td style="text-align:right;color:${pontosSetor<0?'#FCA5A5':'#CBD5E1'};font-weight:600">${pontosSetor !== 0 ? fmtNum(pontosSetor) : '—'}</td>
-      </tr>
+      ${mo !== 0 ? `<tr class="cota-linha"><td>Monitoria</td><td style="text-align:right;color:#94A3B8">—</td><td style="text-align:right;color:#CBD5E1">${fmtNum(mo)}</td><td style="text-align:right;color:${mo>=0?'#CBD5E1':'#FCA5A5'};font-weight:600">${fmtNum(mo)}</td></tr>` : ''}
+      ${pontosSetor !== 0 ? `<tr class="cota-linha-setor"><td>Pontos Ref. ao setor</td><td style="text-align:right;color:#94A3B8">—</td><td style="text-align:right;color:#CBD5E1">—</td><td style="text-align:right;color:${pontosSetor<0?'#FCA5A5':'#CBD5E1'};font-weight:600">${fmtNum(pontosSetor)}</td></tr>` : ''}
     </tbody>
     <tfoot>
       <tr class="cota-linha-total">
@@ -570,6 +628,53 @@ function individualMesHTML(nome, mes, uid) {
   const corMeta     = cotaPts >= META_COTA ? '#10B981' : cotaPts >= META_COTA * 0.6 ? '#F59E0B' : '#EF4444';
   const totalWhats  = sum(data,'whatsapp');
 
+  // Bloco projetos Agnes (só exibe se for a Agnes e houver dados)
+  let agnesBlockHTML = '';
+  const isAgnes = nome.trim().toLowerCase() === 'agnes';
+  if (isAgnes && agnesData.length > 0) {
+    const { total: agnesTotal, linhas: agnesLinhas } = getAgnesTotalMes(mes);
+    if (true) { // sempre exibe se há dados na aba Agnes
+      // Mostra todos os projetos, independente de Feito ser 0
+      const todasLinhas = Object.entries(AGNES_PONTUACOES).map(([campo, pts]) => {
+        const rows = agnesData.filter(r => r.mes === mes || r.mes === 0);
+        const feito = rows.reduce((a, r) => a + (r[campo] || 0), 0);
+        const valor = feito * pts;
+        return { campo, feito, pts, valor };
+      });
+      const agnesRows = todasLinhas.map(l => {
+        const cor = l.valor < 0 ? '#FCA5A5' : l.valor > 0 ? '#CBD5E1' : '#64748B';
+        return `<tr class="cota-linha">
+          <td>${l.campo.charAt(0).toUpperCase() + l.campo.slice(1)}</td>
+          <td style="text-align:right;color:#94A3B8">${l.pts}</td>
+          <td style="text-align:right;color:#CBD5E1">${fmtNum(l.feito)}</td>
+          <td style="text-align:right;color:${cor};font-weight:600">${fmtNum(l.valor)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="4" style="color:#64748B;padding:8px">Nenhum projeto registrado</td></tr>';
+
+      agnesBlockHTML = `
+        <div class="card">
+          <div class="card-title">Projetos — Agnes</div>
+          <table class="cota-tabela">
+            <thead>
+              <tr>
+                <th>Projeto</th>
+                <th style="text-align:right">Pontos</th>
+                <th style="text-align:right">Feito</th>
+                <th style="text-align:right">Valor</th>
+              </tr>
+            </thead>
+            <tbody>${agnesRows}</tbody>
+            <tfoot>
+              <tr class="cota-linha-total">
+                <td colspan="3">Total projetos</td>
+                <td style="text-align:right;color:#10B981;font-weight:700">${fmtNum(agnesTotal)} pts</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>`;
+    }
+  }
+
   return `
     <div class="mes-section ind-mes">
       <div class="mes-header"><span class="mes-titulo">${nm}</span><span class="mes-ano">${anoAtual()}</span></div>
@@ -581,9 +686,10 @@ function individualMesHTML(nome, mes, uid) {
         <div class="kpi"><div class="kpi-label">Punições</div><div class="kpi-value" style="color:${totalPunicao>0?'#FCA5A5':'#94A3B8'}">${totalPunicao>0?'−'+fmtNum(totalPunicao):' — '}</div></div>
         <div class="kpi"><div class="kpi-label">Cota final</div><div class="kpi-value">${fmtNum(Math.max(sum(data,'cota_pts') - totalPunicao, 0))}</div><div class="kpi-sub">líquida − punições</div></div>
       </div>
+      ${agnesBlockHTML}
       <div class="card">
         <div class="card-title">Composição da cota</div>
-        ${tabelaCotaHTML(data, uid)}
+        ${tabelaCotaHTML(data, uid, nome.trim().toLowerCase() === 'agnes')}
       </div>
       ${totalPunicao > 0 ? `
       <div class="card">
@@ -679,11 +785,27 @@ document.getElementById('file-input').addEventListener('change', e => {
   reader.onload = evt => {
     try {
       const wb  = XLSX.read(evt.target.result, { type: 'array', cellDates: false, raw: false });
+
+      // Aba BASE (primeira aba)
       const ws  = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' });
       if (!raw.length) { alert('Planilha vazia.'); return; }
 
       allData = parseRows(raw);
+
+      // Aba Agnes (se existir)
+      agnesData = [];
+      const sheetNames = wb.SheetNames;
+      const agnesSheetName = sheetNames.find(n => n.trim().toLowerCase() === 'agnes');
+      if (agnesSheetName) {
+        const agnesSheet = wb.Sheets[agnesSheetName];
+        const agnesRaw = XLSX.utils.sheet_to_json(agnesSheet, { raw: false, defval: '' });
+        agnesData = parseAgnesRows(agnesRaw);
+        console.log('[Agnes] Aba encontrada:', agnesSheetName, '| Linhas brutas:', agnesRaw.length, '| Linhas válidas:', agnesData.length);
+        if (agnesData.length) console.log('[Agnes] Primeiro registro:', agnesData[0]);
+      } else {
+        console.warn('[Agnes] Aba não encontrada. Abas disponíveis:', sheetNames.join(', '));
+      }
 
       if (!allData.length) {
         const primeiraLinha = raw[0];

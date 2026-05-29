@@ -31,7 +31,7 @@ const C = {
 const AGNES_PONTUACOES = {
   'melhoria nos processos atendimentos': 150,
   'ajustes e melhorias de relatorios':   500,
-  'prevencao a fraudes':                 500,
+  'prevencao a fraudes':                 300,
   'gerenciamento licencas telecom':      250,
   'gerenciamento base de clientes':      250,
   'analise de kpis':                     250,
@@ -39,6 +39,7 @@ const AGNES_PONTUACOES = {
   'medio':                               1000,
   'baixo':                               500,
   'relatorios paralelos':                100,
+  'Analises gerais':                     150,
 };
 
 // ── Pontuações fixas da tabela de cota

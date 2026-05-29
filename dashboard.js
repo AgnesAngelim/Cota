@@ -574,8 +574,8 @@ function tabelaCotaHTML(data, uid, ocultarZeros) {
       ${linha('(NPS) Nota 5', n5, 5)}
       ${linha('Atendimento Presencial', pr, 200)}
       ${linha('Demanda extra', de, 5)}
-      ${linhaSimples('Monitoria', mo)}
-      ${linhaSimples('Pontos Ref. ao setor', pontosSetor)}
+      ${(ocultarZeros && mo === 0) ? '' : linhaSimples('Monitoria', mo)}
+      ${(ocultarZeros && pontosSetor === 0) ? '' : linhaSimples('Pontos Ref. ao setor', pontosSetor)}
     </tbody>
     <tfoot>
       <tr class="cota-linha-total">

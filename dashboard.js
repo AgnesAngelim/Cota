@@ -358,9 +358,7 @@ function geralMesHTML(mes, uid) {
     </div>`;
 
   const totalAts  = sum(data,'atendimentos');
-  const totalPtsSemAgnes = sum(data,'cota_pts'); // soma direta da coluna Cota (pts)
-  const { total: agnesTotalGeral } = getAgnesTotalMes(mes);
-  const totalPts = totalPtsSemAgnes + agnesTotalGeral;
+  const totalPts = sum(data,'cota_pts');
   const csatM     = avg(data,'csat');
   const totalNot  = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const cotaEqPct = members.length ? Math.min(Math.round(totalPts/(META_COTA*members.length)*100),999) : 0;
@@ -369,8 +367,7 @@ function geralMesHTML(mes, uid) {
 
   const quotaRows = members.map(m => {
     const mData = fd(m,mes);
-    const agnesExtra = m.trim().toLowerCase() === 'agnes' ? getAgnesTotalMes(mes).total : 0;
-    const pts = sum(mData,'cota_pts') + agnesExtra; // soma direta da coluna Cota (pts)
+    const pts = sum(mData,'cota_pts');
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>

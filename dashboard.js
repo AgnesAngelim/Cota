@@ -522,6 +522,16 @@ function tabelaCotaHTML(data, uid, ocultarZeros) {
       <td style="text-align:right;color:${cor};font-weight:600">${cota >= 0 ? '' : ''}${fmtNum(cota)}</td>
     </tr>`;
   }
+  
+  function linhaSimples(label, valor) {
+  const cor = valor < 0 ? '#FCA5A5' : valor > 0 ? '#CBD5E1' : '#64748B';
+  return `<tr class="cota-linha">
+    <td>${label}</td>
+    <td style="text-align:right;color:#64748B">—</td>
+    <td style="text-align:right;color:#CBD5E1">${fmtNum(valor)}</td>
+    <td style="text-align:right;color:${cor};font-weight:600">${fmtNum(valor)}</td>
+  </tr>`;
+}
 
   const d = data;
   const w  = sum(d,'whatsapp'),   tr = sum(d,'transferencia');
@@ -564,8 +574,8 @@ function tabelaCotaHTML(data, uid, ocultarZeros) {
       ${linha('(NPS) Nota 5', n5, 5)}
       ${linha('Atendimento Presencial', pr, 200)}
       ${linha('Demanda extra', de, 5)}
-      ${linha('Monitoria', mo, 0)}
-      ${linha('Pontos Ref. ao setor', '', pontosSetor, true)}
+      ${linhaSimples('Monitoria', mo)}
+      ${linhaSimples('Pontos Ref. ao setor', pontosSetor)}
     </tbody>
     <tfoot>
       <tr class="cota-linha-total">

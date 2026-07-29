@@ -13,10 +13,8 @@ const MONITORIA_TITULOS = [
     titulo: 'Comunicação e Linguagem',
     subtitulos: [
       'Empatia',
-      'Evitou jargões ou termos confusos',
       'Explicação clara',
-      'Foco no assunto',
-      'Domínio da conversa e linguagens',
+      'Envio de primeira mensagem adequado',
     ]
   },
   {

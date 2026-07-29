@@ -455,7 +455,9 @@ function geralMesHTML(mes, uid) {
 
   const quotaRows = members.map(m => {
     const mData = fd(m,mes);
-    const pts = sum(mData,'cota_pts');
+    const punicaoM = sum(mData,'p_atraso') + sum(mData,'p_procedimento') +
+                     sum(mData,'p_celular') + sum(mData,'p_omissao') + sum(mData,'p_uniforme');
+    const pts = Math.max(sum(mData,'cota_pts') - punicaoM, 0);
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>
@@ -719,10 +721,10 @@ function individualMesHTML(nome, mes, uid) {
     sum(data,'atend_presencial')*200 + sum(data,'demanda_extra')*5;
   const pontosSetor = sum(data, 'pontos_setor');
   const cotaTotal   = cotaBase + pontosSetor;
-  const cotaPts     = sum(data,'cota_pts');
-  const pctMeta     = (cotaPts / META_COTA * 100).toFixed(1);
-  const corMeta     = cotaPts >= META_COTA ? '#10B981' : cotaPts >= META_COTA * 0.6 ? '#F59E0B' : '#EF4444';
-  const totalWhats  = sum(data,'whatsapp');
+const cotaPts     = Math.max(sum(data,'cota_pts') - totalPunicao, 0);
+const pctMeta     = (cotaPts / META_COTA * 100).toFixed(1);
+const corMeta     = cotaPts >= META_COTA ? '#10B981' : cotaPts >= META_COTA * 0.6 ? '#F59E0B' : '#EF4444';
+const totalWhats  = sum(data,'whatsapp');
 
   // Bloco projetos Agnes (só exibe se for a Agnes e houver dados)
   let agnesBlockHTML = '';

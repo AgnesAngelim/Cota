@@ -728,10 +728,10 @@ const totalWhats  = sum(data,'whatsapp');
 
   // Bloco projetos Agnes (só exibe se for a Agnes e houver dados)
   let agnesBlockHTML = '';
-  const isAgnes = nome.trim().toLowerCase() === 'agnes';
+  const isAgnes = nome.trim().toLowerCase().includes('agnes');
   // Bloco projetos Ana
   let anaBlockHTML = '';
-  const isAna = nome.trim().toLowerCase() === 'ana';
+  const isAna = nome.trim().toLowerCase().includes('ana araújo') || nome.trim().toLowerCase().includes('ana araujo') || (nome.trim().toLowerCase().startsWith('ana') && !nome.trim().toLowerCase().includes('agnes'));
   if (isAna && anaData.length > 0) {
     const { total: anaTotal, linhas: anaLinhas } = getAnaTotalMes(mes);
     const todasLinhasAna = Object.entries(ANA_PONTUACOES).map(([campo, pts]) => {
@@ -831,7 +831,7 @@ const totalWhats  = sum(data,'whatsapp');
       ${anaBlockHTML}
       <div class="card">
         <div class="card-title">Composição da cota</div>
-        ${tabelaCotaHTML(data, uid, ['agnes','ana'].includes(nome.trim().toLowerCase()))}
+        ${tabelaCotaHTML(data, uid, nome.trim().toLowerCase().includes('agnes') || nome.trim().toLowerCase().includes('ana araújo') || nome.trim().toLowerCase().includes('ana araujo') || nome.trim().toLowerCase() === 'ana')}
       </div>
       ${totalPunicao > 0 ? `
       <div class="card">
@@ -938,7 +938,7 @@ document.getElementById('file-input').addEventListener('change', e => {
       // Aba Agnes (se existir)
       agnesData = [];
       const sheetNames = wb.SheetNames;
-      const agnesSheetName = sheetNames.find(n => n.trim().toLowerCase() === 'agnes');
+      const agnesSheetName = sheetNames.find(n => n.trim().toLowerCase().includes('agnes'));
       if (agnesSheetName) {
         const agnesSheet = wb.Sheets[agnesSheetName];
         const agnesRaw = XLSX.utils.sheet_to_json(agnesSheet, { raw: false, defval: '' });
@@ -951,7 +951,7 @@ document.getElementById('file-input').addEventListener('change', e => {
 
       // Aba Ana (se existir)
       anaData = [];
-      const anaSheetName = sheetNames.find(n => n.trim().toLowerCase() === 'ana');
+      const anaSheetName = sheetNames.find(n => n.trim().toLowerCase().includes('ana araújo') || n.trim().toLowerCase().includes('ana araujo') || n.trim().toLowerCase() === 'ana');
       if (anaSheetName) {
         const anaSheet = wb.Sheets[anaSheetName];
         const anaRaw = XLSX.utils.sheet_to_json(anaSheet, { raw: false, defval: '' });

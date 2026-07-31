@@ -46,6 +46,16 @@ const ANA_PONTUACOES = {
   'gestao base de conhecimento':               -1000,
 };
 
+// ── Regra de cota final Agnes (a partir de julho: ×1,2)
+function calcCotaFinal(nomeLower, mes, cotaBruta, totalPunicao) {
+  const base = Math.max(cotaBruta - totalPunicao, 0);
+  // Agnes: a partir de julho (mes >= 7) multiplica por 1,2
+  if (nomeLower.includes('agnes') && mes >= 7) {
+    return Math.round(base * 1.2);
+  }
+  return base;
+}
+
 // ── Pontuações fixas da aba Agnes
 const AGNES_PONTUACOES = {
   'melhoria nos processos atendimentos': 200,
@@ -457,7 +467,7 @@ function geralMesHTML(mes, uid) {
     const mData = fd(m,mes);
     const punicaoM = sum(mData,'p_atraso') + sum(mData,'p_procedimento') +
                      sum(mData,'p_celular') + sum(mData,'p_omissao') + sum(mData,'p_uniforme');
-    const pts = Math.max(sum(mData,'cota_pts') - punicaoM, 0);
+    const pts = calcCotaFinal(m.trim().toLowerCase(), mes, sum(mData,'cota_pts'), punicaoM);
     const pct = Math.min(Math.round(pts/META_COTA*100),100);
     return `<div class="quota-row">
       <div class="quota-name">${m.split(' ')[0]}</div>
@@ -721,7 +731,7 @@ function individualMesHTML(nome, mes, uid) {
     sum(data,'atend_presencial')*200 + sum(data,'demanda_extra')*5;
   const pontosSetor = sum(data, 'pontos_setor');
   const cotaTotal   = cotaBase + pontosSetor;
-const cotaPts     = Math.max(sum(data,'cota_pts') - totalPunicao, 0);
+const cotaPts     = calcCotaFinal(nome.trim().toLowerCase(), mes, sum(data,'cota_pts'), totalPunicao);
 const pctMeta     = (cotaPts / META_COTA * 100).toFixed(1);
 const corMeta     = cotaPts >= META_COTA ? '#10B981' : cotaPts >= META_COTA * 0.6 ? '#F59E0B' : '#EF4444';
 const totalWhats  = sum(data,'whatsapp');
@@ -825,7 +835,7 @@ const totalWhats  = sum(data,'whatsapp');
         <div class="kpi"><div class="kpi-label">Meta</div><div class="kpi-value">${fmtNum(META_COTA)}</div></div>
         <div class="kpi"><div class="kpi-label">% Meta</div><div class="kpi-value" style="color:${corMeta}">${pctMeta}%</div></div>
         <div class="kpi"><div class="kpi-label">Punições</div><div class="kpi-value" style="color:${totalPunicao>0?'#FCA5A5':'#94A3B8'}">${totalPunicao>0?'−'+fmtNum(totalPunicao):' — '}</div></div>
-        <div class="kpi"><div class="kpi-label">Cota final</div><div class="kpi-value">${fmtNum(Math.max(sum(data,'cota_pts') - totalPunicao, 0))}</div><div class="kpi-sub">líquida − punições</div></div>
+        <div class="kpi"><div class="kpi-label">Cota final</div><div class="kpi-value">${fmtNum(calcCotaFinal(nome.trim().toLowerCase(), mes, sum(data,'cota_pts'), totalPunicao))}</div><div class="kpi-sub">${nome.trim().toLowerCase().includes('agnes') && mes >= 7 ? '(cota − pun.) × 1,2' : 'líquida − punições'}</div></div>
       </div>
       ${agnesBlockHTML}
       ${anaBlockHTML}
@@ -838,6 +848,22 @@ const totalWhats  = sum(data,'whatsapp');
         <div class="card-title">Descontos por ocorrência</div>
         ${punicaoRows}
         <div class="punicao-total"><span>Total de descontos</span><span style="color:#FCA5A5">−${fmtNum(totalPunicao)} pts</span></div>
+      </div>` : ''}
+      ${nome.trim().toLowerCase().includes('agnes') && mes >= 7 ? `
+      <div class="card">
+        <div class="card-title">Multiplicador</div>
+        <div class="punicao-row">
+          <span class="punicao-label">Cota após descontos</span>
+          <span class="punicao-val" style="color:var(--txt-claro)">${fmtNum(Math.max(sum(data,'cota_pts') - totalPunicao, 0))} pts</span>
+        </div>
+        <div class="punicao-row">
+          <span class="punicao-label">Multiplicador</span>
+          <span class="punicao-val" style="color:var(--verde-dest)">× 1,2</span>
+        </div>
+        <div class="punicao-total" style="color:var(--verde-dest)">
+          <span>Cota final</span>
+          <span>${fmtNum(calcCotaFinal(nome.trim().toLowerCase(), mes, sum(data,'cota_pts'), totalPunicao))} pts</span>
+        </div>
       </div>` : ''}
     </div>`;
 }

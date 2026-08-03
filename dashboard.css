@@ -421,3 +421,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Linhas clicáveis nas tabelas de projetos ─────────────────────────────── */
 .res-clicavel:hover td { background: rgba(16,185,129,0.08); cursor: pointer; }
 .res-clicavel td:first-child { position: relative; }
+/* ── Botão Exportar HTML ─────────────────────────────────────────────────────── */
+.export-btn {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  font-size: 12px;
+  border-radius: 8px;
+  background: rgba(16,185,129,.12);
+  border: 1px solid rgba(16,185,129,.3);
+  color: var(--verde-dest);
+  cursor: pointer;
+  text-align: center;
+  transition: all .12s;
+  margin-top: 8px;
+}
+.export-btn:hover { background: rgba(16,185,129,.22); border-color: var(--verde); }
+.export-btn:disabled { opacity: .5; cursor: not-allowed; }

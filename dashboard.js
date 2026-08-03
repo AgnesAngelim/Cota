@@ -1177,8 +1177,151 @@ document.getElementById('file-input').addEventListener('change', e => {
       currentPeriodo = -1;
       buildSidebar();
       document.querySelector('[data-view="geral"]').classList.add('active');
+      // Mostra botão de exportar
+      const btnExp = document.getElementById('btn-exportar');
+      if (btnExp) btnExp.style.display = '';
       render();
     } catch (err) { alert('Erro: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 });
+
+// ── EXPORTAR HTML ─────────────────────────────────────────────────────────────
+async function exportarHTML() {
+  if (!allData.length) { alert('Carregue uma planilha antes de exportar.'); return; }
+
+  const btn = document.getElementById('btn-exportar');
+  btn.textContent = 'Gerando...';
+  btn.disabled = true;
+
+  try {
+    // Lê CSS e JS externos
+    const [cssText, jsText, monitoriaText] = await Promise.all([
+      fetch('dashboard.css').then(r => r.text()),
+      fetch('dashboard.js').then(r => r.text()),
+      fetch('monitoria.js').then(r => r.text()).catch(() => ''),
+    ]);
+
+    // Serializa todos os dados em JSON
+    const dados = {
+      allData,
+      agnesData,
+      anaData,
+      resAgnesData,
+      resAnaData,
+      monitorias: (() => { try { return JSON.parse(localStorage.getItem('igreen_monitorias') || '[]'); } catch { return []; } })(),
+    };
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard iGreen — Exportado ${new Date().toLocaleDateString('pt-BR')}</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
+  <style>${cssText}
+  .upload-btn       { display: none !important; }
+  #file-input        { display: none !important; }
+  .export-btn        { display: none !important; }
+  .upload-hint       { display: none !important; }
+  .mon-btn-salvar    { display: none !important; }
+  .mon-btn-limpar    { display: none !important; }
+  .mon-footer        { display: none !important; }
+  .mon-input         { pointer-events: none; background: var(--fundo-medio) !important; }
+  .mon-select        { pointer-events: none; background: var(--fundo-medio) !important; }
+  .mon-toggle        { pointer-events: none; }
+  .mon-hist-del      { display: none !important; }
+  .mon-titulo-header { cursor: default !important; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-dot">iG</div>
+      <span class="sb-logo-name">iGreen</span>
+    </div>
+    <div class="sb-title">Visão</div>
+    <div class="nav-item active" data-view="geral">Geral</div>
+    <div class="nav-item" data-view="monitoria">Monitoria</div>
+    <div class="nav-div"></div>
+    <div class="sb-title" id="sb-colab-title">Colaboradores</div>
+    <div id="nav-members"></div>
+    <div id="upload-zone">
+      <input type="file" id="file-input" style="display:none">
+      <div class="upload-hint"></div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="topbar">
+      <span id="page-title">Geral</span>
+      <div id="period-controls">
+        <button class="arrow-btn" id="btn-prev">&#8592;</button>
+        <span id="trimestre-badge">Trimestre 1</span>
+        <span id="trimestre-range"></span>
+        <button class="arrow-btn" id="btn-next">&#8594;</button>
+      </div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+<script>
+// ── Dados embutidos
+const DADOS_EXPORTADOS = ${JSON.stringify(dados)};
+
+// ── Injeta dados e localStorage
+${jsText.replace(
+  'let allData = [];',
+  `let allData = DADOS_EXPORTADOS.allData;`
+).replace(
+  'let agnesData = [];    // dados da aba Agnes (projetos extras)',
+  `let agnesData = DADOS_EXPORTADOS.agnesData;`
+).replace(
+  'let anaData = [];      // dados da aba Ana (projetos extras)',
+  `let anaData = DADOS_EXPORTADOS.anaData;`
+).replace(
+  'let resAgnesData = []; // dados da aba Res Agnes (detalhes por demanda)',
+  `let resAgnesData = DADOS_EXPORTADOS.resAgnesData;`
+).replace(
+  'let resAnaData = [];   // dados da aba Res Ana (detalhes por demanda)',
+  `let resAnaData = DADOS_EXPORTADOS.resAnaData;`
+)}
+<\/script>
+${monitoriaText ? `<script>
+${monitoriaText}
+// Injeta monitorias salvas
+try { localStorage.setItem('igreen_monitorias', JSON.stringify(DADOS_EXPORTADOS.monitorias)); } catch {}
+<\/script>` : ''}
+<script>
+// Inicializa com dados embutidos
+document.addEventListener('DOMContentLoaded', () => {
+  buildSidebar();
+  const geralBtn = document.querySelector('[data-view="geral"]');
+  if (geralBtn) geralBtn.classList.add('active');
+  currentView = 'geral';
+  currentPeriodo = -1;
+  render();
+});
+<\/script>
+</body>
+</html>`;
+
+    // Download
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `dashboard-igreen-${new Date().toISOString().slice(0,10)}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch (err) {
+    alert('Erro ao exportar: ' + err.message);
+  } finally {
+    btn.textContent = '↓ Exportar HTML';
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btn-exportar')?.addEventListener('click', exportarHTML);

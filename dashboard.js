@@ -406,6 +406,10 @@ function fd(view, mes) {
 // ── Utilitários 
 function sum(data, key) { return data.reduce((a, r) => a + (r[key] || 0), 0); }
 function avg(data, key) { return data.length ? sum(data, key) / data.length : 0; }
+function avgSemZero(data, key) {
+  const vals = data.map(r => r[key] || 0).filter(v => v > 0);
+  return vals.length ? vals.reduce((a,v) => a+v, 0) / vals.length : 0;
+}
 function fmtNum(n)  { return Math.round(n).toLocaleString('pt-BR'); }
 function fmtPct(n)  { return parseFloat(n).toFixed(1) + '%'; }
 function fmtMin(n)  { const v = parseFloat(n); return isNaN(v) ? '—' : v.toFixed(1) + ' min'; }
@@ -457,7 +461,7 @@ function geralMesHTML(mes, uid) {
 
   const totalAts  = sum(data,'atendimentos');
   const totalPts = sum(data,'cota_pts');
-  const csatM     = avg(data,'csat');
+  const csatM     = avgSemZero(data,'csat');
   const totalNot  = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const cotaEqPct = members.length ? Math.min(Math.round(totalPts/(META_COTA*members.length)*100),999) : 0;
   const tel=sum(data,'telecom'), clu=sum(data,'club'), intl=sum(data,'internacional');
@@ -522,7 +526,7 @@ function individualMesHTML_OLD_UNUSED(nome, mes, uid) {
   const totalDemandaExtra = sum(data,'demanda_extra');
   const ptsPres    = totalPresencial2 * 200;
   const cotaBruta  = cotaBase + ptsPres + totalDemandaExtra;
-  const csatM    = avg(data,'csat');
+  const csatM    = avgSemZero(data,'csat');
   const totalNot = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const pctGeral = ((totalAts/(sum(fd('geral',mes),'atendimentos')||1))*100).toFixed(1);
 
@@ -699,7 +703,7 @@ function individualMesHTML(nome, mes, uid) {
     </div>`;
 
   const totalAts = sum(data,'atendimentos');
-  const csatM    = avg(data,'csat');
+  const csatM    = avgSemZero(data,'csat');
   const totalNot = sum(data,'nota1')+sum(data,'nota2')+sum(data,'nota3')+sum(data,'nota4')+sum(data,'nota5');
   const pctGeral = ((totalAts/(sum(fd('geral',mes),'atendimentos')||1))*100).toFixed(1);
 

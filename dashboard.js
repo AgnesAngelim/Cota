@@ -1,7 +1,9 @@
 const META_COTA = 5000;
 let allData = [];
-let agnesData = []; // dados da aba Agnes (projetos extras)
-let anaData = [];   // dados da aba Ana (projetos extras)
+let agnesData = [];    // dados da aba Agnes (projetos extras)
+let anaData = [];      // dados da aba Ana (projetos extras)
+let resAgnesData = []; // dados da aba Res Agnes (detalhes por demanda)
+let resAnaData = [];   // dados da aba Res Ana (detalhes por demanda)
 let members = [];
 let currentView = 'geral';
 let currentPeriodo = -1; // -1 = todos os meses, 0..3 = trimestres
@@ -69,7 +71,7 @@ const AGNES_PONTUACOES = {
   'baixo':                               500,
   'relatorios paralelos':                100,
   'Criação de relatórios':               150,
-  'Analises de fraude':                  50,
+  'Analise de fraudes':                  50,
 };
 
 // ── Pontuações fixas da tabela de cota
@@ -105,10 +107,14 @@ function navPrev() {
 // ── Leitura flexível de colunas 
 // Normaliza string: minúsculas, sem acentos, sem espaços extras, travessão→hífen
 function normalizeKey(s) {
+  // Substitui caracteres especiais ANTES do NFD para garantir normalização correta
   return String(s).trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .replace(/[\u2014\u2013\u2012]/g, '-')           // travessão → hífen
-    .replace(/\s+/g, ' ');                              // espaços múltiplos → um
+    .replace(/ç/g,'c').replace(/ã/g,'a').replace(/õ/g,'o')
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+    .replace(/â/g,'a').replace(/ê/g,'e').replace(/ô/g,'o').replace(/à/g,'a')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u2014\u2013\u2012]/g, '-')
+    .replace(/\s+/g, ' ');
 }
 
 function col(row, ...keys) {
@@ -142,8 +148,8 @@ function parseMesOrdem(valor) {
   // Remove espaços, caracteres invisíveis e normaliza
   const s = String(valor).trim().replace(/[\u00A0\u200B\uFEFF]/g, '');
 
-  // Formato "jun/26" ou "jun/2026" (abreviação mês/ano)
-  const mAbrev = s.match(/^([a-záéíóúâêôãõç]{3})\/?(\d{2}|\d{4})$/i);
+  // Formato "jun/26", "jun-26", "jun/2026" (abreviação mês/ano com / ou -)
+  const mAbrev = s.match(/^([a-záéíóúâêôãõç]{3})[\/\-]?(\d{2}|\d{4})$/i);
   if (mAbrev) {
     const nomeMes = mAbrev[1].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const mesNum  = MESES_ABREV[nomeMes];
@@ -352,6 +358,121 @@ function getAnaTotalMes(mes) {
     total += valor;
   });
   return { total, linhas };
+}
+
+// ── Parse das abas Res Agnes / Res Ana ───────────────────────────────────────
+// Formato: mês aparece como cabeçalho numa linha (jul/26), depois Data|Demanda|Descrição
+function parseResData(wb, sheetName) {
+  const ws = wb.Sheets[sheetName];
+  if (!ws) return [];
+
+  // Lê como array de arrays — captura TODAS as linhas incluindo mescladas
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+  const results = [];
+  let mesAtual = 0, anoAtual2 = 0;
+
+  // Log de diagnóstico — primeiras 10 linhas brutas
+  console.log(`[${sheetName}] Primeiras linhas brutas:`, rows.slice(0, 10));
+
+  rows.forEach((row, idx) => {
+    // Verifica TODAS as células da linha em busca de um mês
+    for (const cell of row) {
+      const s = String(cell).trim();
+      if (!s) continue;
+      const parsed = parseMesOrdem(s);
+      if (parsed && parsed.mes >= 1 && parsed.mes <= 12) {
+        // Verifica se a linha SÓ tem esse valor (linha de cabeçalho de mês)
+        const nonEmpty = row.filter(c => String(c).trim()).length;
+        if (nonEmpty <= 2) {
+          mesAtual = parsed.mes;
+          anoAtual2 = parsed.ano;
+          console.log(`[${sheetName}] Mês detectado na linha ${idx}:`, parsed);
+          return; // pula para próxima linha
+        }
+      }
+    }
+
+    // Pula linhas de cabeçalho
+    const r0 = String(row[0] || '').trim().toLowerCase();
+    const r1 = String(row[1] || '').trim().toLowerCase();
+    if (r0 === 'data' || r1 === 'demanda' || r1 === 'descrição' || r1 === 'descricao') return;
+
+    // Linha de dados — pega as 3 primeiras colunas não vazias
+    const nonEmpty = row.map(c => String(c).trim()).filter(Boolean);
+    if (nonEmpty.length < 2) return;
+
+    // Tenta encontrar Data (col0), Demanda (col1), Descrição (col2)
+    const data      = String(row[0] || '').trim();
+    const demanda   = String(row[1] || '').trim();
+    const descricao = String(row[2] || '').trim();
+
+    if (!demanda || mesAtual === 0) return;
+
+    results.push({ mes: mesAtual, ano: anoAtual2, data, demanda, descricao });
+  });
+
+  console.log(`[${sheetName}] Total registros:`, results.length);
+  console.log(`[${sheetName}] Meses:`, [...new Set(results.map(r => r.mes))]);
+  console.log(`[${sheetName}] Demandas:`, [...new Set(results.map(r => r.demanda))]);
+  return results;
+}
+
+function getResRegistros(resData, mes, demanda) {
+  const normDemanda = normalizeKey(demanda);
+  return resData.filter(r => {
+    if (r.mes !== mes && r.mes !== 0) return false;
+    const normR = normalizeKey(r.demanda);
+    // Match exato
+    if (normR === normDemanda) return true;
+    // Match parcial — planilha pode ter nome abreviado (ex: "Analise de fraude" vs "Analises de fraude")
+    if (normR.length >= 6 && normDemanda.startsWith(normR)) return true;
+    if (normDemanda.length >= 6 && normR.startsWith(normDemanda)) return true;
+    return false;
+  });
+}
+
+function abrirModalRes(registros, titulo) {
+  document.getElementById('res-modal')?.remove();
+
+  const linhas = registros.length
+    ? registros.map(r => `
+        <tr>
+          <td style="color:var(--label);white-space:nowrap;padding:8px 10px;border-bottom:1px solid var(--divisoria)">${r.data || '—'}</td>
+          <td style="color:var(--txt-claro);padding:8px 10px;border-bottom:1px solid var(--divisoria)">${r.demanda || '—'}</td>
+          <td style="color:var(--label);padding:8px 10px;border-bottom:1px solid var(--divisoria)">${r.descricao || '—'}</td>
+        </tr>`).join('')
+    : `<tr><td colspan="3" style="padding:16px;color:var(--txt-aux);text-align:center">Sem registros para este campo</td></tr>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'res-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,.85);display:flex;align-items:flex-start;justify-content:center;z-index:99999;padding:40px 20px;overflow-y:auto;';
+  modal.innerHTML = `
+    <div style="background:var(--bloco);border:1px solid var(--divisoria);border-radius:14px;width:100%;max-width:680px;margin:0 auto;flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--divisoria);background:var(--fundo-medio);">
+        <span style="font-size:14px;font-weight:700;color:var(--branco)">${titulo}</span>
+        <button id="res-modal-fechar" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--divisoria);background:transparent;color:var(--label);cursor:pointer;font-size:13px;">✕</button>
+      </div>
+      <div style="overflow-y:auto;max-height:calc(100vh - 160px);">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:var(--fundo-medio);">
+              <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:600;color:var(--txt-aux);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--divisoria)">Data</th>
+              <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:600;color:var(--txt-aux);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--divisoria)">Demanda</th>
+              <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:600;color:var(--txt-aux);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--divisoria)">Descrição</th>
+            </tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  document.body.style.overflow = 'auto';
+  document.body.appendChild(modal);
+
+  const fechar = () => { modal.remove(); document.body.style.overflow = ''; };
+  document.getElementById('res-modal-fechar').addEventListener('click', fechar);
+  modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+  document.addEventListener('keydown', function onKey(e) { if (e.key === 'Escape') { fechar(); document.removeEventListener('keydown', onKey); } });
 }
 
 // ── Sidebar dinâmica 
@@ -756,8 +877,15 @@ const totalWhats  = sum(data,'whatsapp');
     });
     const anaRowsHTML = todasLinhasAna.map(l => {
       const cor = l.valor < 0 ? '#FCA5A5' : l.valor > 0 ? '#CBD5E1' : '#64748B';
-      return `<tr class="cota-linha">
-        <td>${l.campo.charAt(0).toUpperCase() + l.campo.slice(1)}</td>
+      const temRes = resAnaData.some(r => {
+        if (r.mes !== mes && r.mes !== 0) return false;
+        const nR = normalizeKey(r.demanda), nC = normalizeKey(l.campo);
+        return nR === nC || (nR.length >= 6 && nC.startsWith(nR)) || (nC.length >= 6 && nR.startsWith(nC));
+      });
+      const cursor = temRes ? 'cursor:pointer;' : '';
+      const hover  = temRes ? 'class="cota-linha res-clicavel"' : 'class="cota-linha"';
+      return `<tr ${hover} data-campo="${l.campo}" data-mes="${mes}" data-tipo="ana" style="${cursor}">
+        <td>${l.campo.charAt(0).toUpperCase() + l.campo.slice(1)}${temRes ? ' <span style="color:var(--verde-dest);font-size:10px">●</span>' : ''}</td>
         <td style="text-align:right;color:#94A3B8">${l.pts}</td>
         <td style="text-align:right;color:#CBD5E1">${fmtNum(l.feito)}</td>
         <td style="text-align:right;color:${cor};font-weight:600">${fmtNum(l.valor)}</td>
@@ -798,8 +926,15 @@ const totalWhats  = sum(data,'whatsapp');
       });
       const agnesRows = todasLinhas.map(l => {
         const cor = l.valor < 0 ? '#FCA5A5' : l.valor > 0 ? '#CBD5E1' : '#64748B';
-        return `<tr class="cota-linha">
-          <td>${l.campo.charAt(0).toUpperCase() + l.campo.slice(1)}</td>
+        const temRes = resAgnesData.some(r => {
+          if (r.mes !== mes && r.mes !== 0) return false;
+          const nR = normalizeKey(r.demanda), nC = normalizeKey(l.campo);
+          return nR === nC || (nR.length >= 6 && nC.startsWith(nR)) || (nC.length >= 6 && nR.startsWith(nC));
+        });
+        const cursor = temRes ? 'cursor:pointer;' : '';
+        const hover  = temRes ? 'class="cota-linha res-clicavel"' : 'class="cota-linha"';
+        return `<tr ${hover} data-campo="${l.campo}" data-mes="${mes}" data-tipo="agnes" style="${cursor}">
+          <td>${l.campo.charAt(0).toUpperCase() + l.campo.slice(1)}${temRes ? ' <span style="color:var(--verde-dest);font-size:10px">●</span>' : ''}</td>
           <td style="text-align:right;color:#94A3B8">${l.pts}</td>
           <td style="text-align:right;color:#CBD5E1">${fmtNum(l.feito)}</td>
           <td style="text-align:right;color:${cor};font-weight:600">${fmtNum(l.valor)}</td>
@@ -941,7 +1076,20 @@ function render() {
   content.appendChild(footer);
   content.scrollTop = 0;
 
-
+  // Bind cliques nas linhas de projetos Agnes/Ana
+  setTimeout(() => {
+    document.querySelectorAll('.res-clicavel').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const campo = tr.dataset.campo;
+        const mes2  = parseInt(tr.dataset.mes);
+        const tipo  = tr.dataset.tipo;
+        const resData = tipo === 'agnes' ? resAgnesData : resAnaData;
+        const regs = getResRegistros(resData, mes2, campo);
+        const titulo = campo.charAt(0).toUpperCase() + campo.slice(1);
+        abrirModalRes(regs, titulo);
+      });
+    });
+  }, 100);
 }
 
 // ── Eventos 
@@ -989,6 +1137,22 @@ document.getElementById('file-input').addEventListener('change', e => {
         console.log('[Ana] Aba encontrada:', anaSheetName, '| Linhas brutas:', anaRaw.length, '| Linhas válidas:', anaData.length);
       } else {
         console.warn('[Ana] Aba não encontrada. Abas disponíveis:', sheetNames.join(', '));
+      }
+
+      // Aba Res Agnes
+      resAgnesData = [];
+      const resAgnesName = sheetNames.find(n => normalizeKey(n).includes('res agnes') || normalizeKey(n) === 'res agnes');
+      if (resAgnesName) {
+        resAgnesData = parseResData(wb, resAgnesName);
+        console.log('[Res Agnes] Registros:', resAgnesData.length);
+      }
+
+      // Aba Res Ana
+      resAnaData = [];
+      const resAnaName = sheetNames.find(n => normalizeKey(n).includes('res ana') || normalizeKey(n) === 'res ana');
+      if (resAnaName) {
+        resAnaData = parseResData(wb, resAnaName);
+        console.log('[Res Ana] Registros:', resAnaData.length);
       }
 
       if (!allData.length) {
